@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict
-from datetime import datetime, date
+from typing import  List, Dict
+from datetime import date
 import yfinance as yf
 import pandas as pd
 
@@ -18,12 +18,6 @@ DOW_TICKERS = [
     "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT"
 ]
 
-class Item(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
-    tax: Optional[float] = None
-
 class DateRange(BaseModel):
     start_date: date
     end_date: date
@@ -31,24 +25,6 @@ class DateRange(BaseModel):
 class StockReturns(BaseModel):
     returns: Dict[str, List[float]]
     dates: List[date]
-
-@app.get("/")
-async def root():
-    return {"message": "Welcome to DowData API"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-@app.post("/items/")
-async def create_item(item: Item):
-    return item
-
-@app.get("/items/{item_id}")
-async def read_item(item_id: int):
-    if item_id < 0:
-        raise HTTPException(status_code=400, detail="Item ID must be positive")
-    return {"item_id": item_id, "name": "Sample Item"}
 
 @app.post("/dow/daily-returns")
 async def get_dow_daily_returns(date_range: DateRange) -> StockReturns:
