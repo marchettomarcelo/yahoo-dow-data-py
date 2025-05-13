@@ -59,7 +59,7 @@ async def get_dow_daily_returns(date_range: DateRange) -> StockReturns:
                 # Get closing prices
                 close_prices = data[ticker]['Close']
                 # Calculate daily returns
-                daily_returns = close_prices.pct_change().dropna()
+                daily_returns = close_prices.pct_change()
                 # Filter returns to the requested date range
                 date_index = daily_returns.index
                 mask = (date_index >= start_date_ts) & (date_index <= end_date_ts)
