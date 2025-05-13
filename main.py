@@ -35,11 +35,11 @@ async def get_dow_daily_returns(date_range: DateRange) -> StockReturns:
         # Fetch one extra day before start_date and include end_date
         data = yf.download(
             tickers=DOW_TICKERS,
-            start=date_range.start_date - timedelta(days=1),
-            end=date_range.end_date + timedelta(days=1),
+            start=date_range.start_date - timedelta(days=10),
+            end=date_range.end_date + timedelta(days=10),
             group_by='ticker'
         )
-        
+        print(data)
         if data.empty:
             raise HTTPException(status_code=404, detail="No data available for the specified date range")
 
