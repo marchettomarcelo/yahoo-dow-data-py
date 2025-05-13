@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import  List, Dict
-from datetime import date
+from typing import List, Dict
+from datetime import date, timedelta
 import yfinance as yf
 import pandas as pd
 
@@ -28,26 +28,30 @@ class StockReturns(BaseModel):
 
 @app.post("/dow/daily-returns")
 async def get_dow_daily_returns(date_range: DateRange) -> StockReturns:
+    if date_range.start_date > date_range.end_date:
+        raise HTTPException(status_code=400, detail="start_date must be before or equal to end_date")
+
     try:
-        # Download data for all Dow stocks
+        # Fetch one extra day before start_date and include end_date
         data = yf.download(
             tickers=DOW_TICKERS,
-            start=date_range.start_date,
-            end=date_range.end_date,
+            start=date_range.start_date - timedelta(days=1),
+            end=date_range.end_date + timedelta(days=1),
             group_by='ticker'
         )
+        
+        if data.empty:
+            raise HTTPException(status_code=404, detail="No data available for the specified date range")
+
+        # Convert start_date and end_date to pandas Timestamp for comparison
+        start_date_ts = pd.Timestamp(date_range.start_date)
+        end_date_ts = pd.Timestamp(date_range.end_date)
         
         # Initialize the response structure
         response = {
             "returns": {},
             "dates": []
         }
-        
-        # Get the dates from the first available stock
-        first_ticker = next((ticker for ticker in DOW_TICKERS if ticker in data), None)
-        if first_ticker:
-            dates = data[first_ticker].index
-            response["dates"] = [d.date() for d in dates]
         
         # Calculate daily returns for each stock
         for ticker in DOW_TICKERS:
@@ -56,8 +60,21 @@ async def get_dow_daily_returns(date_range: DateRange) -> StockReturns:
                 close_prices = data[ticker]['Close']
                 # Calculate daily returns
                 daily_returns = close_prices.pct_change().dropna()
+                # Filter returns to the requested date range
+                date_index = daily_returns.index
+                mask = (date_index >= start_date_ts) & (date_index <= end_date_ts)
+                filtered_returns = daily_returns[mask]
                 # Convert to list of floats
-                response["returns"][ticker] = [float(r) for r in daily_returns]
+                response["returns"][ticker] = [float(r) for r in filtered_returns]
+        
+        # Get the dates from the filtered returns of the first available stock
+        first_ticker = next((ticker for ticker in DOW_TICKERS if ticker in data and response["returns"][ticker]), None)
+        if first_ticker:
+            filtered_dates = data[first_ticker]['Close'].pct_change().dropna().index
+            filtered_dates = filtered_dates[(filtered_dates >= start_date_ts) & (filtered_dates <= end_date_ts)]
+            response["dates"] = [d.date() for d in filtered_dates]
+        else:
+            raise HTTPException(status_code=404, detail="No valid returns data for any stock in the date range")
         
         return StockReturns(**response)
     
